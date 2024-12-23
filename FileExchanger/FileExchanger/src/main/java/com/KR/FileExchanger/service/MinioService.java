@@ -3,10 +3,13 @@ package com.KR.FileExchanger.service;
 import com.KR.FileExchanger.exception.FileStorageException;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
+import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.Result;
+import io.minio.messages.Item;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
@@ -17,6 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class MinioService implements FileStorageService {
@@ -32,20 +40,22 @@ public class MinioService implements FileStorageService {
         this.minioClient = minioClient;
     }
 
-    public void ensureBucketExists() throws Exception {
-        boolean bucketExists = minioClient.bucketExists(
-                BucketExistsArgs.builder()
-                        .bucket(bucketName)
-                        .build()
+
+    @Override
+    public List<String> getAllFiles() throws Exception {
+        List<String> fileNames = new ArrayList<>();
+        Iterable<Result<Item>> objects = minioClient.listObjects(
+                ListObjectsArgs.builder().bucket(bucketName).build()
         );
-        if (!bucketExists) {
-            minioClient.makeBucket(
-                    MakeBucketArgs.builder()
-                            .bucket(bucketName)
-                            .build()
-            );
+
+        for (Result<Item> result : objects) {
+            Item item = result.get();
+            fileNames.add(item.objectName()); // Имя файла
         }
+
+        return fileNames;
     }
+
     @Override
     public void uploadFile(MultipartFile file) throws Exception {
         ensureBucketExists();
@@ -92,5 +102,20 @@ public class MinioService implements FileStorageService {
                         .object(filename)
                         .build()
         );
+    }
+
+    public void ensureBucketExists() throws Exception {
+        boolean bucketExists = minioClient.bucketExists(
+                BucketExistsArgs.builder()
+                        .bucket(bucketName)
+                        .build()
+        );
+        if (!bucketExists) {
+            minioClient.makeBucket(
+                    MakeBucketArgs.builder()
+                            .bucket(bucketName)
+                            .build()
+            );
+        }
     }
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/files")
@@ -32,6 +33,16 @@ public class MinioController {
 
     public MinioController(FileStorageService fileStorageService) {
         this.fileStorageService = fileStorageService;
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<List<String>> listFiles() {
+        try {
+            List<String> files = fileStorageService.getAllFiles(); // Получение списка файлов через сервис
+            return ResponseEntity.ok(files);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PostMapping("/upload")
