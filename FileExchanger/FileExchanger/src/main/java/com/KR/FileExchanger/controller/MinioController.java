@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -37,10 +36,13 @@ public class MinioController {
 
     @GetMapping("/list")
     public ResponseEntity<List<String>> listFiles() {
+        log.info("Listing files in the bucket");
         try {
             List<String> files = fileStorageService.getAllFiles(); // Получение списка файлов через сервис
+            log.debug("Files found: {}", files);
             return ResponseEntity.ok(files);
         } catch (Exception e) {
+            log.error("Error while listing files", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -54,24 +56,6 @@ public class MinioController {
             return ResponseEntity.status(500).body("Error uploading file: " + e.getMessage());
         }
     }
-
-//    @GetMapping("/download/{filename}")
-//    public ResponseEntity<byte[]> downloadFile(@PathVariable String filename) throws Exception {
-//        log.info("Downloading file: {}", filename);
-//
-//        try (InputStream inputStream = fileStorageService.downloadFile(filename)) {
-//            byte[] content = inputStream.readAllBytes();
-//
-//            HttpHeaders headers = new HttpHeaders();
-//            headers.setContentDisposition(ContentDisposition.builder("attachment")
-//                    .filename(filename, StandardCharsets.UTF_8)
-//                    .build());
-//            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-//
-//            log.info("Successfully downloaded file: {}", filename);
-//            return new ResponseEntity<>(content, headers, HttpStatus.OK);
-//        }
-//    }
 
     @GetMapping("/download/{filename}")
     public void downloadFile(@PathVariable String filename, HttpServletResponse response) throws Exception {
