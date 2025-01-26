@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8090/api/v1/files"; // Замените на ваш URL
+const API_URL = "http://localhost:8090/api/v1/files"; 
 
 function logMessage(type, message) {
     const timestamp = new Date().toISOString();
