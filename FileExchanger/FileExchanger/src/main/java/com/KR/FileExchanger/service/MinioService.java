@@ -26,13 +26,12 @@ public class MinioService implements FileStorageService {
 
     private static final Logger logger = LoggerFactory.getLogger(MinioService.class);
 
-    @Value("${minio.bucket-name}")
-    private String bucketName;
+    private final String bucketName;
 
-    public MinioService(MinioClient minioClient) {
+    public MinioService(MinioClient minioClient, @Value("${minio.bucket-name}") String bucketName) {
         this.minioClient = minioClient;
+        this.bucketName = bucketName;
     }
-
 
     @Override
     public List<String> getAllFiles() throws Exception {
@@ -46,6 +45,7 @@ public class MinioService implements FileStorageService {
             fileNames.add(item.objectName()); // Имя файла
         }
 
+        logger.info("Files in bucket '{}': {}", bucketName, fileNames);
         return fileNames;
     }
 
@@ -77,6 +77,7 @@ public class MinioService implements FileStorageService {
     @Override
     public InputStream downloadFile(String filename) throws Exception {
         ensureBucketExists();
+        logger.debug("Downloading file...");
         return minioClient.getObject(
                 GetObjectArgs.builder()
                         .bucket(bucketName)
@@ -88,7 +89,7 @@ public class MinioService implements FileStorageService {
     @Override
     public void deleteFile(String filename) throws Exception {
         ensureBucketExists();
-
+        logger.debug("Deleting file...");
         minioClient.removeObject(
                 RemoveObjectArgs.builder()
                         .bucket(bucketName)
