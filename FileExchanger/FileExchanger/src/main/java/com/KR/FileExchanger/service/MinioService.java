@@ -1,5 +1,8 @@
 package com.KR.FileExchanger.service;
 
+import com.KR.FileExchanger.exception.FileDeleteException;
+import com.KR.FileExchanger.exception.FileNotFoundException;
+import com.KR.FileExchanger.exception.FileUploadException;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.ListObjectsArgs;
@@ -50,12 +53,13 @@ public class MinioService implements FileStorageService {
     }
 
     @Override
-    public void uploadFile(MultipartFile file) throws Exception {
-        ensureBucketExists();
-
-        logger.info("Uploading file: {}", file.getOriginalFilename());
-
+    public void uploadFile(MultipartFile file) throws FileUploadException {
+        if (file == null || file.getOriginalFilename().isEmpty()) {
+            throw new FileUploadException("File name is empty or invalid", new IllegalArgumentException());
+        }
         try {
+            ensureBucketExists();
+            logger.debug("Uploading file: {}", file.getOriginalFilename());
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucketName)
@@ -64,38 +68,47 @@ public class MinioService implements FileStorageService {
                             .contentType(file.getContentType())
                             .build()
             );
-
             logger.info("File uploaded successfully: {}", file.getOriginalFilename());
-
         } catch (Exception e) {
-
             logger.error("Error uploading file: {}", file.getOriginalFilename(), e);
-            throw e;
+            throw new FileUploadException("Error uploading file: " + file.getOriginalFilename(), e);
         }
     }
 
     @Override
-    public InputStream downloadFile(String filename) throws Exception {
-        ensureBucketExists();
-        logger.debug("Downloading file...");
-        return minioClient.getObject(
-                GetObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(filename)
-                        .build()
-        );
+    public InputStream downloadFile(String filename) throws FileNotFoundException {
+        if (filename == null || filename.isEmpty()) {
+            throw new FileNotFoundException("File name is empty or invalid");
+        }
+        try {
+            ensureBucketExists();
+            logger.debug("Downloading file...");
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(filename)
+                            .build());
+        } catch (Exception e) {
+            logger.error("File not found");
+            throw new FileNotFoundException("File not found: " + filename);
+        }
     }
 
     @Override
-    public void deleteFile(String filename) throws Exception {
-        ensureBucketExists();
-        logger.debug("Deleting file...");
-        minioClient.removeObject(
-                RemoveObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(filename)
-                        .build()
-        );
+    public void deleteFile(String filename) throws FileDeleteException {
+        try {
+            ensureBucketExists();
+            logger.debug("Deleting file...");
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(filename)
+                            .build()
+            );
+        } catch (Exception e) {
+            logger.error("Error deleting file");
+            throw new FileDeleteException("Error deleting file: " + filename);
+        }
     }
 
     public void ensureBucketExists() throws Exception {
