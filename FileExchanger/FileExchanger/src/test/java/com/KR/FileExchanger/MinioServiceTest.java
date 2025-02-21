@@ -1,5 +1,8 @@
 package com.KR.FileExchanger;
 
+import com.KR.FileExchanger.exception.FileDeleteException;
+import com.KR.FileExchanger.exception.FileNotFoundException;
+import com.KR.FileExchanger.exception.FileUploadException;
 import com.KR.FileExchanger.service.MinioService;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
@@ -30,6 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 public class MinioServiceTest {
@@ -120,32 +124,36 @@ public class MinioServiceTest {
         when(mockFile.getContentType()).thenReturn("text/plain");
 
         when(minioClient.putObject(any(PutObjectArgs.class)))
-                .thenThrow(new RuntimeException("Minio is down"));
+                .thenThrow(new FileUploadException("Error uploading file: test.txt",  new RuntimeException()));
 
-        Exception ex = assertThrows(RuntimeException.class, () -> minioService.uploadFile(mockFile));
+        Exception ex = assertThrows(FileUploadException.class, () -> minioService.uploadFile(mockFile));
 
-        assertEquals("Minio is down", ex.getMessage());
+        assertEquals("Error uploading file: test.txt", ex.getMessage());
         verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
     }
 
     @Test
-    void testDownloadFileFails() throws Exception {
+    void testDownloadFileNotFound() throws Exception {
         when(minioClient.getObject(any(GetObjectArgs.class)))
-                .thenThrow(new RuntimeException("File not found"));
+                .thenThrow(new FileNotFoundException("File not found: file.txt"));
 
-        Exception ex = assertThrows(RuntimeException.class, () -> minioService.downloadFile("file.txt"));
+        Exception ex = assertThrows(FileNotFoundException.class, () -> minioService.downloadFile("file.txt"));
 
-        assertEquals("File not found", ex.getMessage());
+        assertEquals("File not found: file.txt", ex.getMessage());
         verify(minioClient, times(1)).getObject(any(GetObjectArgs.class));
     }
+
     @Test
     void testDeleteFileFails() throws Exception {
-        doThrow(new RuntimeException("Delete failed")).when(minioClient).removeObject(any(RemoveObjectArgs.class));
+        doThrow(new FileDeleteException("Error deleting file: file.txt"))
+                .when(minioClient).removeObject(any(RemoveObjectArgs.class));
 
-        Exception ex = assertThrows(RuntimeException.class, () -> minioService.deleteFile("file.txt"));
-        assertEquals("Delete failed", ex.getMessage());
+        Exception ex = assertThrows(FileDeleteException.class, () -> minioService.deleteFile("file.txt"));
+
+        assertEquals("Error deleting file: file.txt", ex.getMessage());
         verify(minioClient, times(1)).removeObject(any(RemoveObjectArgs.class));
     }
+
     @Test
     void testGetAllFilesFails() throws Exception {
         when(minioClient.listObjects(any(ListObjectsArgs.class)))
@@ -155,5 +163,22 @@ public class MinioServiceTest {
 
         assertEquals("Minio error", ex.getMessage());
         verify(minioClient, times(1)).listObjects(any(ListObjectsArgs.class));
+    }
+    @Test
+    void testUploadFileEmptyNameFails() throws Exception {
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.getOriginalFilename()).thenReturn("");
+
+        Exception ex = assertThrows(FileUploadException.class, () -> minioService.uploadFile(mockFile));
+        assertEquals("File name is empty or invalid", ex.getMessage());
+    }
+    @Test
+    void testDownloadFileEmptyNameFails() throws Exception {
+        when(minioClient.getObject(any(GetObjectArgs.class)))
+                .thenThrow(new FileNotFoundException("File name is empty or invalid"));
+
+        Exception ex = assertThrows(FileNotFoundException.class, () -> minioService.downloadFile(""));
+
+        assertEquals("File name is empty or invalid", ex.getMessage());
     }
 }
