@@ -23,8 +23,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,8 +50,8 @@ public class MinioServiceTest {
 
         when(mockFile.getOriginalFilename()).thenReturn("test.txt");
         when(mockFile.getInputStream()).thenReturn(new ByteArrayInputStream("test content".getBytes()));
-        when(mockFile.getSize()).thenReturn(11L); // Размер файла в байтах
-        when(mockFile.getBytes()).thenReturn("test content".getBytes()); // Содержимое файла в виде массива байтов
+        when(mockFile.getSize()).thenReturn(11L);
+        when(mockFile.getBytes()).thenReturn("test content".getBytes());
         when(mockFile.getContentType()).thenReturn("text/plain");
 
         when(minioClient.putObject(any(PutObjectArgs.class))).thenReturn(null);
@@ -103,6 +105,55 @@ public class MinioServiceTest {
         assertEquals(1, fileNames.size());
         assertEquals("test.txt", fileNames.get(0));
 
+        verify(minioClient, times(1)).listObjects(any(ListObjectsArgs.class));
+    }
+
+    //Fails tests________________________________________________________________________________________
+
+    @Test
+    void testUploadFileFails() throws Exception {
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.getOriginalFilename()).thenReturn("test.txt");
+        when(mockFile.getInputStream()).thenReturn(new ByteArrayInputStream("test content".getBytes()));
+        when(mockFile.getSize()).thenReturn(11L);
+        when(mockFile.getBytes()).thenReturn("test content".getBytes());
+        when(mockFile.getContentType()).thenReturn("text/plain");
+
+        when(minioClient.putObject(any(PutObjectArgs.class)))
+                .thenThrow(new RuntimeException("Minio is down"));
+
+        Exception ex = assertThrows(RuntimeException.class, () -> minioService.uploadFile(mockFile));
+
+        assertEquals("Minio is down", ex.getMessage());
+        verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    void testDownloadFileFails() throws Exception {
+        when(minioClient.getObject(any(GetObjectArgs.class)))
+                .thenThrow(new RuntimeException("File not found"));
+
+        Exception ex = assertThrows(RuntimeException.class, () -> minioService.downloadFile("file.txt"));
+
+        assertEquals("File not found", ex.getMessage());
+        verify(minioClient, times(1)).getObject(any(GetObjectArgs.class));
+    }
+    @Test
+    void testDeleteFileFails() throws Exception {
+        doThrow(new RuntimeException("Delete failed")).when(minioClient).removeObject(any(RemoveObjectArgs.class));
+
+        Exception ex = assertThrows(RuntimeException.class, () -> minioService.deleteFile("file.txt"));
+        assertEquals("Delete failed", ex.getMessage());
+        verify(minioClient, times(1)).removeObject(any(RemoveObjectArgs.class));
+    }
+    @Test
+    void testGetAllFilesFails() throws Exception {
+        when(minioClient.listObjects(any(ListObjectsArgs.class)))
+                .thenThrow(new RuntimeException("Minio error"));
+
+        Exception ex = assertThrows(RuntimeException.class, () -> minioService.getAllFiles());
+
+        assertEquals("Minio error", ex.getMessage());
         verify(minioClient, times(1)).listObjects(any(ListObjectsArgs.class));
     }
 }

@@ -20,8 +20,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -101,5 +105,47 @@ public class MinioControllerTest {
         assertEquals(HttpStatus.OK, responseEntity.getStatusCode());
         assertEquals("File deleted successfully", responseEntity.getBody());
         verify(fileStorageService, times(1)).deleteFile("test.txt");
+    }
+    //Fails tests________________________________________________________________________________________
+
+    @Test
+    void testUploadFileFails() throws Exception {
+        doThrow(new Exception("Upload failed")).when(fileStorageService).uploadFile(any(MultipartFile.class));
+        ResponseEntity<String> responseEntity = minioController.uploadFile(multipartFile);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, responseEntity.getStatusCode());
+        assertEquals("Error uploading file: Upload failed", responseEntity.getBody());
+    }
+
+    @Test
+    void testDownloadFileFails() throws Exception {
+        when(fileStorageService.downloadFile(anyString()))
+                .thenThrow(new RuntimeException("File not found"));
+        Exception ex = assertThrows(RuntimeException.class,
+                () -> minioController.downloadFile("file", httpServletResponse));
+
+        assertEquals("File not found", ex.getMessage());
+        verify(fileStorageService, times(1)).downloadFile(anyString());
+    }
+
+    @Test
+    void testDeleteFailFails() throws Exception {
+        doThrow(new RuntimeException("Delete failed")).when(fileStorageService).deleteFile(anyString());
+
+        ResponseEntity<String> responseEntity = minioController.deleteFile("file");
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, responseEntity.getStatusCode());
+        assertEquals("Error deleting file: Delete failed", responseEntity.getBody());
+        verify(fileStorageService, times(1)).deleteFile(anyString());
+    }
+
+    @Test
+    void testListFilesFails() throws Exception {
+        when(fileStorageService.getAllFiles()).thenThrow(new RuntimeException("MinIO error"));
+
+        ResponseEntity<List<String>> response = minioController.listFiles();
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNull(response.getBody());
     }
 }
