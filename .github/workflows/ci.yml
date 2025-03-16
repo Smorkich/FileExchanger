@@ -7,8 +7,8 @@ on:
       - develop
   pull_request:
     branches:
-      - main
-      - develop
+      - master
+      - dev
 
 jobs:
   build_and_test:
