@@ -26,5 +26,4 @@ jobs:
           cache: maven
 
       - name: Запуск тестов
-        working-directory: FileExchanger  # Указываем путь к проекту
         run: mvn test --batch-mode
